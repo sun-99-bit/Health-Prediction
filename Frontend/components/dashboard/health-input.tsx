@@ -70,7 +70,7 @@ export function HealthInput() {
     setError(null)
 
     try {
-      const res = await fetch(`${apiUrl}/api/predict/`, {
+      const res = await fetch('https://health-prediction-1rcn.onrender.com/api/predict/', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
