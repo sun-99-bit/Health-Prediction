@@ -46,7 +46,7 @@ const bmiColors = [
 ]
 
 // Sleep vs Stress scatter data
-const sleepStressData = Array.from({ length: 80 }, (_, i) => ({
+const sleepStressData = Array.from({ length: 80 }, () => ({
   sleep: Number.parseFloat((3 + Math.random() * 7).toFixed(1)),
   stress: Math.floor(1 + Math.random() * 10),
   disease: Math.random() > 0.65 ? "Yes" : "No",
@@ -54,15 +54,15 @@ const sleepStressData = Array.from({ length: 80 }, (_, i) => ({
 
 interface CustomTooltipProps {
   active?: boolean
-  payload?: Array<{ payload: Record<string, unknown>; value: unknown }>
+  payload?: any[]
   label?: string
 }
 
 function AgeTooltip({ active, payload, label }: CustomTooltipProps) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-md">
-      <p className="font-semibold text-card-foreground">Age: {label}</p>
+    <div className="rounded-lg border bg-card px-3 py-2 text-sm shadow-md">
+      <p className="font-semibold">Age: {label}</p>
       <p className="text-muted-foreground">
         Disease Rate: <span className="font-medium text-primary">{payload[0].value}%</span>
       </p>
@@ -74,13 +74,11 @@ function BmiTooltip({ active, payload }: CustomTooltipProps) {
   if (!active || !payload?.length) return null
   const data = payload[0].payload
   return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-md">
-      <p className="font-semibold text-card-foreground">{data.label as string}</p>
+    <div className="rounded-lg border bg-card px-3 py-2 text-sm shadow-md">
+      <p className="font-semibold">{data.label}</p>
+      <p className="text-muted-foreground">BMI Range: {data.range}</p>
       <p className="text-muted-foreground">
-        BMI Range: <span className="font-medium text-card-foreground">{data.range as string}</span>
-      </p>
-      <p className="text-muted-foreground">
-        Count: <span className="font-medium text-primary">{data.count as number}</span>
+        Count: <span className="font-medium text-primary">{data.count}</span>
       </p>
     </div>
   )
@@ -89,16 +87,21 @@ function BmiTooltip({ active, payload }: CustomTooltipProps) {
 function ScatterTooltip({ active, payload }: CustomTooltipProps) {
   if (!active || !payload?.length) return null
   const data = payload[0].payload
+  const isDisease = data.disease === "Yes"
+
   return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-md">
+    <div className="rounded-lg border bg-card px-3 py-2 text-sm shadow-md">
       <p className="text-muted-foreground">
-        Sleep: <span className="font-medium text-card-foreground">{data.sleep as number}h</span>
+        Sleep: <span className="font-medium">{data.sleep}h</span>
       </p>
       <p className="text-muted-foreground">
-        Stress: <span className="font-medium text-card-foreground">{data.stress as number}/10</span>
+        Stress: <span className="font-medium">{data.stress}/10</span>
       </p>
       <p className="text-muted-foreground">
-        Disease: <span className={`font-medium ${(data.disease as string) === "Yes" ? "text-destructive" : "text-success"}`}>{data.disease as string}</span>
+        Disease:{" "}
+        <span className={`font-semibold ${isDisease ? "text-destructive" : "text-green-600"}`}>
+          {data.disease}
+        </span>
       </p>
     </div>
   )
@@ -110,116 +113,69 @@ export function AnalyticsCharts() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Top row: Age group + BMI */}
+      {/* Age + BMI */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Age group bar chart */}
-        <Card className="border-border/50">
+        {/* Age Chart */}
+        <Card>
           <CardHeader>
-            <CardTitle className="text-lg text-card-foreground">Age Group vs Chronic Disease</CardTitle>
-            <CardDescription>
-              Percentage of chronic disease by age bracket
-            </CardDescription>
+            <CardTitle>Age Group vs Chronic Disease</CardTitle>
+            <CardDescription>Percentage of disease by age group</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ageGroupData} margin={{ top: 5, right: 5, bottom: 5, left: -10 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis
-                    dataKey="group"
-                    tick={{ fontSize: 12 }}
-                    className="fill-muted-foreground"
-                  />
-                  <YAxis
-                    tick={{ fontSize: 12 }}
-                    className="fill-muted-foreground"
-                    tickFormatter={(v) => `${v}%`}
-                  />
-                  <Tooltip content={<AgeTooltip />} />
-                  <Bar
-                    dataKey="diseaseRate"
-                    fill="hsl(174, 62%, 38%)"
-                    radius={[6, 6, 0, 0]}
-                    maxBarSize={48}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+          <CardContent className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={ageGroupData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="group" />
+                <YAxis tickFormatter={(v) => `${v}%`} />
+                <Tooltip content={<AgeTooltip />} />
+                <Bar dataKey="diseaseRate" fill="hsl(174, 62%, 38%)" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        {/* BMI Distribution */}
-        <Card className="border-border/50">
+        {/* BMI Chart */}
+        <Card>
           <CardHeader>
-            <CardTitle className="text-lg text-card-foreground">BMI Distribution</CardTitle>
-            <CardDescription>
-              Distribution across WHO BMI categories
-            </CardDescription>
+            <CardTitle>BMI Distribution</CardTitle>
+            <CardDescription>WHO BMI categories</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={bmiDistribution} margin={{ top: 5, right: 5, bottom: 5, left: -10 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis
-                    dataKey="range"
-                    tick={{ fontSize: 11 }}
-                    className="fill-muted-foreground"
-                  />
-                  <YAxis
-                    tick={{ fontSize: 12 }}
-                    className="fill-muted-foreground"
-                  />
-                  <Tooltip content={<BmiTooltip />} />
-                  <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={48}>
-                    {bmiDistribution.map((_, index) => (
-                      <Cell key={`bmi-cell-${index}`} fill={bmiColors[index]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+          <CardContent className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={bmiDistribution}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="range" />
+                <YAxis />
+                <Tooltip content={<BmiTooltip />} />
+                <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                  {bmiDistribution.map((_, i) => (
+                    <Cell key={i} fill={bmiColors[i]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
 
-      {/* Sleep vs Stress scatter */}
-      <Card className="border-border/50">
+      {/* Scatter */}
+      <Card>
         <CardHeader>
-          <CardTitle className="text-lg text-card-foreground">Sleep Hours vs Stress Level</CardTitle>
-          <CardDescription>
-            Correlation between sleep duration and stress, colored by chronic disease status
-          </CardDescription>
+          <CardTitle>Sleep vs Stress</CardTitle>
+          <CardDescription>Disease correlation</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart margin={{ top: 10, right: 10, bottom: 10, left: -10 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis
-                  type="number"
-                  dataKey="sleep"
-                  name="Sleep"
-                  unit="h"
-                  domain={[3, 10]}
-                  tick={{ fontSize: 12 }}
-                  className="fill-muted-foreground"
-                />
-                <YAxis
-                  type="number"
-                  dataKey="stress"
-                  name="Stress"
-                  domain={[1, 10]}
-                  tick={{ fontSize: 12 }}
-                  className="fill-muted-foreground"
-                />
-                <Tooltip content={<ScatterTooltip />} />
-                <Legend />
-                <Scatter name="No Disease" data={diseaseNo} fill="hsl(174, 62%, 38%)" fillOpacity={0.7} />
-                <Scatter name="Has Disease" data={diseaseYes} fill="hsl(0, 84%, 60%)" fillOpacity={0.7} />
-              </ScatterChart>
-            </ResponsiveContainer>
-          </div>
+        <CardContent className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <ScatterChart>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis type="number" dataKey="sleep" unit="h" domain={[3, 10]} />
+              <YAxis type="number" dataKey="stress" domain={[1, 10]} />
+              <Tooltip content={<ScatterTooltip />} />
+              <Legend />
+              <Scatter name="No Disease" data={diseaseNo} fill="hsl(174, 62%, 38%)" />
+              <Scatter name="Has Disease" data={diseaseYes} fill="hsl(0, 84%, 60%)" />
+            </ScatterChart>
+          </ResponsiveContainer>
         </CardContent>
       </Card>
     </div>

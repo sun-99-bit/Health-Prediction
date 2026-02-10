@@ -52,7 +52,7 @@ DATABASES = {}
 # CORS
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
-    "https://health-prediction-eta.vercel.app",
+    "https://health-prediction-rho.vercel.app",
 ]
 
 STATIC_URL = 'static/'
