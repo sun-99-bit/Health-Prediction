@@ -4,16 +4,16 @@ import os
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, "health_model_pipeline.pkl")
+MODEL_PATH = os.path.join(BASE_DIR, "RFC.pkl")
 
 loaded_pipeline = joblib.load(MODEL_PATH)
 print("Model loaded successfully!")
 
 
-
 GENDER_MAP = {
     "male": "Male",
-    "female": "Female"
+    "female": "Female",
+    "other": "Other"
 }
 
 SMOKER_MAP = {
@@ -30,8 +30,8 @@ ALCOHOL_MAP = {
 
 EXERCISE_MAP = {
     "none": "None",
-    "1-2": "1-2",
-    "3-5": "3-5",
+    "1-2": "1-2 times/week",
+    "3-5": "3-5 times/week",
     "daily": "Daily"
 }
 
@@ -43,51 +43,47 @@ DIET_MAP = {
 }
 
 
-
-def prepare_dataframe(data):
+def prepare_dataframe(data: dict) -> pd.DataFrame:
     try:
-        df = pd.DataFrame([{
+        return pd.DataFrame([{
             "Age": int(data["age"]),
-            "Height_cm": int(data["height"]),
-            "Weight_kg": int(data["weight"]),
+            "Height_cm": float(data["height"]),
+            "Weight_kg": float(data["weight"]),
             "BMI": float(data["bmi"]),
             "Stress_Level": int(data["stressLevel"]),
             "Sleep_Hours": float(data["sleepHours"]),
 
             "Gender": GENDER_MAP[data["gender"].lower()],
             "Smoker": SMOKER_MAP[data["smoker"].lower()],
-            "Alcohol_Consumption": ALCOHOL_MAP[data["alcohol"].lower()],
             "Exercise_Freq": EXERCISE_MAP[data["exercise"].lower()],
             "Diet_Quality": DIET_MAP[data["diet"].lower()],
+            "Alcohol_Consumption": ALCOHOL_MAP[data["alcohol"].lower()],
         }])
-
-        return df
 
     except KeyError as e:
         raise ValueError(f"Unsupported input value: {e}")
 
 
+def predict_health(data: dict) -> dict:
+    df = prepare_dataframe(data)
 
-def predict_health(data: dict):
-    try:
-        df = prepare_dataframe(data)
+    
+    probability = float(loaded_pipeline.predict_proba(df)[0][1])
 
-        prediction = loaded_pipeline.predict(df)[0]
+    
+    threshold = 0.60
+    prediction = "Yes" if probability >= threshold else "No"
 
-        confidence = None
-        if hasattr(loaded_pipeline, "predict_proba"):
-            confidence = max(loaded_pipeline.predict_proba(df)[0])
 
-        return {
-            "chronicDisease": bool(prediction),
-            "confidence": round(confidence * 100, 2) if confidence else None,
-            "riskLevel": (
-                "High" if confidence and confidence > 0.7 else
-                "Medium" if confidence and confidence > 0.4 else
-                "Low"
-            )
-        }
+    if probability >= 0.38:
+        risk = "High"
+    elif probability >= 0.35:
+        risk = "Medium"
+    else:
+        risk = "Low"
 
-    except Exception as e:
-        print("Prediction error:", e)
-        raise e
+    return {
+        "chronicDisease": prediction,
+        "probability": round(probability * 100, 2),
+        "riskLevel": risk
+    }
