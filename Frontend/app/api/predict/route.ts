@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server"
 
-const defaultBackendUrl = "https://health-prediction-1rcn.onrender.com"
-
 const cleanBase = (value: string) => value.replace(/\/+$/, "")
 const normalizeBase = (value: string) =>
   value.endsWith("/api/predict") || value.endsWith("/api/predict/")
@@ -12,11 +10,17 @@ export async function POST(request: Request) {
   try {
     const payload = await request.json()
     const configured = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL
-    // If user configured an API URL, do not silently fall back to default.
-    // This avoids masking local/backend deployment issues with stale predictions.
-    const candidates = configured ? [configured] : [defaultBackendUrl]
-    const bases = candidates
-      .filter((value): value is string => Boolean(value))
+    if (!configured) {
+      return NextResponse.json(
+        {
+          error: "API_URL is not configured",
+          details: "Set API_URL (or NEXT_PUBLIC_API_URL) in deployment environment variables.",
+        },
+        { status: 500 },
+      )
+    }
+
+    const bases = [configured]
       .map((value) => cleanBase(normalizeBase(value)))
       .filter((value, index, arr) => arr.indexOf(value) === index)
 
