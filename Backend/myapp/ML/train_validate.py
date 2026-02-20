@@ -30,6 +30,7 @@ FEATURE_COLUMNS = [
 
 TARGET_COLUMN = "Chronic_Disease"
 POSITIVE_LABEL = "Yes"
+MIN_POSITIVE_RECALL = 0.10
 
 NUMERIC_COLUMNS = ["Age", "Height_cm", "Weight_kg", "BMI", "Stress_Level", "Sleep_Hours"]
 CATEGORICAL_COLUMNS = ["Gender", "Smoker", "Exercise_Freq", "Diet_Quality", "Alcohol_Consumption"]
@@ -138,15 +139,32 @@ def train_and_select_model(df, random_state):
 
         y_pred = pipeline.predict(x_test)
         y_proba = get_positive_probability(pipeline, x_test)
-        auc = roc_auc_score((y_test == POSITIVE_LABEL).astype(int), y_proba)
+        y_true_bin = (y_test == POSITIVE_LABEL).astype(int)
+        y_pred_bin = (y_pred == POSITIVE_LABEL).astype(int)
+        auc = roc_auc_score(y_true_bin, y_proba)
+        pos_recall = (y_pred_bin[y_true_bin == 1].sum() / max(1, y_true_bin.sum()))
 
         print_metrics(name, y_test, y_pred, y_proba)
         print_feature_importance(name, pipeline, top_k=20)
+
+        # Skip models that collapse to "always No" behavior.
+        if pos_recall < MIN_POSITIVE_RECALL:
+            print(
+                f"Skipping {name}: positive recall {pos_recall:.4f} is below "
+                f"minimum {MIN_POSITIVE_RECALL:.2f}."
+            )
+            continue
 
         if auc > best_auc:
             best_auc = auc
             best_name = name
             best_pipeline = pipeline
+
+    if best_pipeline is None:
+        raise RuntimeError(
+            "No candidate model met minimum positive recall threshold. "
+            "Review dataset quality or tune model settings."
+        )
 
     print(f"\nSelected model: {best_name} (ROC-AUC={best_auc:.4f})")
     return best_pipeline

@@ -1,37 +1,37 @@
 import os
+from typing import Any
 
 import joblib
 import pandas as pd
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, "RFC.pkl")
+MODEL_CANDIDATES = (
+    os.path.join(BASE_DIR, "health_model_pipeline.pkl"),
+    os.path.join(BASE_DIR, "RFC.pkl"),
+)
 
-loaded_pipeline = joblib.load(MODEL_PATH)
-print("Model loaded successfully!")
-
-# The trained model has weak signal on the current dataset.
-# Keep it as a secondary signal and rely more on stable rules.
 MODEL_WEIGHT = 0.15
 RULE_WEIGHT = 0.85
 
 GENDER_MAP = {
     "male": "Male",
+    "m": "Male",
     "female": "Female",
-<<<<<<< HEAD
-=======
-    "other": "Other"
->>>>>>> 38514db75f612133358b63aa34f441baf9e1ba83
+    "f": "Female",
+    "other": "Other",
 }
 
 SMOKER_MAP = {
     "yes": "Yes",
+    "true": "Yes",
+    "1": "Yes",
     "no": "No",
+    "false": "No",
+    "0": "No",
 }
 
 ALCOHOL_MAP = {
-    # Model was trained without a "None" alcohol class.
-    # Map UI "none" to the lowest known category.
     "none": "Low",
     "low": "Low",
     "moderate": "Moderate",
@@ -39,18 +39,14 @@ ALCOHOL_MAP = {
 }
 
 EXERCISE_MAP = {
-<<<<<<< HEAD
-    # Match OneHotEncoder training categories exactly.
-    "none": "1-2 times/week",
-    "1-2": "1-2 times/week",
-    "3-5": "3-5 times/week",
-    "daily": "Daily",
-=======
     "none": "None",
+    "0": "None",
     "1-2": "1-2 times/week",
+    "1-2 times/week": "1-2 times/week",
     "3-5": "3-5 times/week",
-    "daily": "Daily"
->>>>>>> 38514db75f612133358b63aa34f441baf9e1ba83
+    "3-5 times/week": "3-5 times/week",
+    "daily": "Daily",
+    "everyday": "Daily",
 }
 
 DIET_MAP = {
@@ -61,59 +57,89 @@ DIET_MAP = {
 }
 
 
-<<<<<<< HEAD
-def prepare_dataframe(data):
-    try:
-        return pd.DataFrame(
-            [
-                {
-                    "Age": int(data["age"]),
-                    "Height_cm": int(data["height"]),
-                    "Weight_kg": int(data["weight"]),
-                    "BMI": float(data["bmi"]),
-                    "Stress_Level": int(data["stressLevel"]),
-                    "Sleep_Hours": float(data["sleepHours"]),
-                    "Gender": GENDER_MAP[data["gender"].lower()],
-                    "Smoker": SMOKER_MAP[data["smoker"].lower()],
-                    "Alcohol_Consumption": ALCOHOL_MAP[data["alcohol"].lower()],
-                    "Exercise_Freq": EXERCISE_MAP[data["exercise"].lower()],
-                    "Diet_Quality": DIET_MAP[data["diet"].lower()],
-                }
-            ]
-        )
-=======
+def load_pipeline():
+    last_error = None
+    for model_path in MODEL_CANDIDATES:
+        if not os.path.exists(model_path):
+            continue
+        try:
+            pipeline = joblib.load(model_path)
+            print(f"Model loaded successfully from: {model_path}")
+            return pipeline
+        except Exception as exc:  # pragma: no cover
+            last_error = exc
+    if last_error is not None:
+        raise RuntimeError(f"Failed to load model: {last_error}") from last_error
+    raise RuntimeError("No model file found in ML directory.")
+
+
+loaded_pipeline = load_pipeline()
+
+
+def normalized(value: Any) -> str:
+    return str(value).strip().lower()
+
+
+def get_mapped(mapping: dict[str, str], raw_value: Any, field_name: str) -> str:
+    key = normalized(raw_value)
+    if key not in mapping:
+        allowed = ", ".join(sorted(mapping))
+        raise ValueError(f"Unsupported value for '{field_name}': {raw_value}. Allowed: {allowed}")
+    return mapping[key]
+
+
 def prepare_dataframe(data: dict) -> pd.DataFrame:
-    try:
-        return pd.DataFrame([{
-            "Age": int(data["age"]),
-            "Height_cm": float(data["height"]),
-            "Weight_kg": float(data["weight"]),
-            "BMI": float(data["bmi"]),
-            "Stress_Level": int(data["stressLevel"]),
-            "Sleep_Hours": float(data["sleepHours"]),
+    required_fields = [
+        "age",
+        "height",
+        "weight",
+        "bmi",
+        "stressLevel",
+        "sleepHours",
+        "gender",
+        "smoker",
+        "exercise",
+        "diet",
+        "alcohol",
+    ]
+    missing = [field for field in required_fields if field not in data and field != "bmi"]
+    if missing:
+        raise ValueError(f"Missing required fields: {', '.join(missing)}")
 
-            "Gender": GENDER_MAP[data["gender"].lower()],
-            "Smoker": SMOKER_MAP[data["smoker"].lower()],
-            "Exercise_Freq": EXERCISE_MAP[data["exercise"].lower()],
-            "Diet_Quality": DIET_MAP[data["diet"].lower()],
-            "Alcohol_Consumption": ALCOHOL_MAP[data["alcohol"].lower()],
-        }])
+    height_cm = float(data["height"])
+    weight_kg = float(data["weight"])
+    bmi = float(data["bmi"]) if "bmi" in data and data["bmi"] not in ("", None) else weight_kg / ((height_cm / 100) ** 2)
 
->>>>>>> 38514db75f612133358b63aa34f441baf9e1ba83
-    except KeyError as e:
-        raise ValueError(f"Unsupported input value: {e}")
+    return pd.DataFrame(
+        [
+            {
+                "Age": int(data["age"]),
+                "Height_cm": height_cm,
+                "Weight_kg": weight_kg,
+                "BMI": bmi,
+                "Stress_Level": int(data["stressLevel"]),
+                "Sleep_Hours": float(data["sleepHours"]),
+                "Gender": get_mapped(GENDER_MAP, data["gender"], "gender"),
+                "Smoker": get_mapped(SMOKER_MAP, data["smoker"], "smoker"),
+                "Exercise_Freq": get_mapped(EXERCISE_MAP, data["exercise"], "exercise"),
+                "Diet_Quality": get_mapped(DIET_MAP, data["diet"], "diet"),
+                "Alcohol_Consumption": get_mapped(ALCOHOL_MAP, data["alcohol"], "alcohol"),
+            }
+        ]
+    )
 
 
-<<<<<<< HEAD
 def rule_based_risk(data: dict) -> float:
     age = int(data["age"])
-    bmi = float(data["bmi"])
+    height_cm = float(data["height"])
+    weight_kg = float(data["weight"])
+    bmi = float(data["bmi"]) if "bmi" in data and data["bmi"] not in ("", None) else weight_kg / ((height_cm / 100) ** 2)
     stress = int(data["stressLevel"])
     sleep = float(data["sleepHours"])
-    smoker = data["smoker"].lower()
-    alcohol = data["alcohol"].lower()
-    exercise = data["exercise"].lower()
-    diet = data["diet"].lower()
+    smoker = normalized(data["smoker"])
+    alcohol = normalized(data["alcohol"])
+    exercise = normalized(data["exercise"])
+    diet = normalized(data["diet"])
 
     score = 0.0
 
@@ -166,77 +192,60 @@ def rule_based_risk(data: dict) -> float:
     return min(score, 1.0)
 
 
-def normalize_model_prediction(prediction) -> bool:
-    if isinstance(prediction, str):
-        return prediction.strip().lower() in {"1", "yes", "true", "positive", "high"}
-    return int(prediction) == 1
-
-
-def get_proba_yes(df: pd.DataFrame):
+def get_model_positive_probability(df: pd.DataFrame) -> float:
     if not hasattr(loaded_pipeline, "predict_proba"):
-        return None
+        return 0.0
 
     proba_row = loaded_pipeline.predict_proba(df)[0]
     classes = list(getattr(loaded_pipeline, "classes_", []))
 
-    yes_index = None
+    positive_aliases = {"1", "yes", "true", "positive", "high"}
+    negative_aliases = {"0", "no", "false", "negative", "low"}
+
+    positive_index = None
+    negative_index = None
+
     for idx, cls in enumerate(classes):
-        if str(cls).strip().lower() in {"1", "yes", "true", "positive", "high"}:
-            yes_index = idx
-            break
+        cls_norm = normalized(cls)
+        if cls_norm in positive_aliases and positive_index is None:
+            positive_index = idx
+        if cls_norm in negative_aliases and negative_index is None:
+            negative_index = idx
 
-    if yes_index is not None and yes_index < len(proba_row):
-        return float(proba_row[yes_index])
+    if positive_index is None and len(proba_row) == 2:
+        if negative_index is not None:
+            positive_index = 1 - negative_index
+        elif len(classes) == 2:
+            # For binary sklearn classifiers, classes_ are sorted and positive is commonly index 1.
+            positive_index = 1
 
-    return float(max(proba_row))
+    if positive_index is not None and positive_index < len(proba_row):
+        return float(proba_row[positive_index])
 
-=======
+    return 0.5
+
+
 def predict_health(data: dict) -> dict:
     df = prepare_dataframe(data)
->>>>>>> 38514db75f612133358b63aa34f441baf9e1ba83
+    model_proba_yes = get_model_positive_probability(df)
+    rules_proba_yes = rule_based_risk(data)
 
-    
-    probability = float(loaded_pipeline.predict_proba(df)[0][1])
+    combined_proba_yes = (MODEL_WEIGHT * model_proba_yes) + (RULE_WEIGHT * rules_proba_yes)
+    combined_proba_yes = min(1.0, max(0.0, combined_proba_yes))
 
-<<<<<<< HEAD
-        prediction = loaded_pipeline.predict(df)[0]
-        model_label = normalize_model_prediction(prediction)
-        model_proba_yes = get_proba_yes(df)
-        if model_proba_yes is None:
-            model_proba_yes = 1.0 if model_label else 0.0
+    if rules_proba_yes >= 0.78:
+        combined_proba_yes = max(combined_proba_yes, 0.75)
 
-        rules_proba_yes = rule_based_risk(data)
-        combined_proba_yes = (MODEL_WEIGHT * model_proba_yes) + (RULE_WEIGHT * rules_proba_yes)
-        # Ensure obviously risky profiles are not under-called due to weak model calibration.
-        if rules_proba_yes >= 0.78:
-            combined_proba_yes = max(combined_proba_yes, 0.75)
-        chronic_disease = combined_proba_yes >= 0.5
-
-        return {
-            "chronicDisease": chronic_disease,
-            "confidence": round(combined_proba_yes * 100, 2),
-            "riskLevel": (
-                "High" if combined_proba_yes > 0.7 else
-                "Medium" if combined_proba_yes > 0.4 else
-                "Low"
-            ),
-        }
-=======
-    
-    threshold = 0.60
-    prediction = "Yes" if probability >= threshold else "No"
-
-
-    if probability >= 0.38:
-        risk = "High"
-    elif probability >= 0.35:
-        risk = "Medium"
+    if combined_proba_yes > 0.7 or rules_proba_yes >= 0.6:
+        risk_level = "High"
+    elif combined_proba_yes > 0.4:
+        risk_level = "Medium"
     else:
-        risk = "Low"
->>>>>>> 38514db75f612133358b63aa34f441baf9e1ba83
+        risk_level = "Low"
 
     return {
-        "chronicDisease": prediction,
-        "probability": round(probability * 100, 2),
-        "riskLevel": risk
+        "chronicDisease": combined_proba_yes >= 0.5,
+        "confidence": round(combined_proba_yes * 100, 2),
+        "probability": round(combined_proba_yes * 100, 2),
+        "riskLevel": risk_level,
     }

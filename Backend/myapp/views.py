@@ -14,6 +14,12 @@ def health_predict(request):
 
         return Response(result, status=200)
 
+    except ValueError as e:
+        return Response(
+            {"error": str(e)},
+            status=400
+        )
+
     except Exception as e:
         return Response(
             {"error": str(e)},
