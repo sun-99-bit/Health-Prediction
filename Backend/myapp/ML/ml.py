@@ -5,7 +5,7 @@ import pandas as pd
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, "health_model_pipeline.pkl")
+MODEL_PATH = os.path.join(BASE_DIR, "RFC.pkl")
 
 loaded_pipeline = joblib.load(MODEL_PATH)
 print("Model loaded successfully!")
@@ -15,10 +15,13 @@ print("Model loaded successfully!")
 MODEL_WEIGHT = 0.15
 RULE_WEIGHT = 0.85
 
-
 GENDER_MAP = {
     "male": "Male",
     "female": "Female",
+<<<<<<< HEAD
+=======
+    "other": "Other"
+>>>>>>> 38514db75f612133358b63aa34f441baf9e1ba83
 }
 
 SMOKER_MAP = {
@@ -36,11 +39,18 @@ ALCOHOL_MAP = {
 }
 
 EXERCISE_MAP = {
+<<<<<<< HEAD
     # Match OneHotEncoder training categories exactly.
     "none": "1-2 times/week",
     "1-2": "1-2 times/week",
     "3-5": "3-5 times/week",
     "daily": "Daily",
+=======
+    "none": "None",
+    "1-2": "1-2 times/week",
+    "3-5": "3-5 times/week",
+    "daily": "Daily"
+>>>>>>> 38514db75f612133358b63aa34f441baf9e1ba83
 }
 
 DIET_MAP = {
@@ -51,6 +61,7 @@ DIET_MAP = {
 }
 
 
+<<<<<<< HEAD
 def prepare_dataframe(data):
     try:
         return pd.DataFrame(
@@ -70,10 +81,30 @@ def prepare_dataframe(data):
                 }
             ]
         )
+=======
+def prepare_dataframe(data: dict) -> pd.DataFrame:
+    try:
+        return pd.DataFrame([{
+            "Age": int(data["age"]),
+            "Height_cm": float(data["height"]),
+            "Weight_kg": float(data["weight"]),
+            "BMI": float(data["bmi"]),
+            "Stress_Level": int(data["stressLevel"]),
+            "Sleep_Hours": float(data["sleepHours"]),
+
+            "Gender": GENDER_MAP[data["gender"].lower()],
+            "Smoker": SMOKER_MAP[data["smoker"].lower()],
+            "Exercise_Freq": EXERCISE_MAP[data["exercise"].lower()],
+            "Diet_Quality": DIET_MAP[data["diet"].lower()],
+            "Alcohol_Consumption": ALCOHOL_MAP[data["alcohol"].lower()],
+        }])
+
+>>>>>>> 38514db75f612133358b63aa34f441baf9e1ba83
     except KeyError as e:
         raise ValueError(f"Unsupported input value: {e}")
 
 
+<<<<<<< HEAD
 def rule_based_risk(data: dict) -> float:
     age = int(data["age"])
     bmi = float(data["bmi"])
@@ -159,11 +190,15 @@ def get_proba_yes(df: pd.DataFrame):
 
     return float(max(proba_row))
 
+=======
+def predict_health(data: dict) -> dict:
+    df = prepare_dataframe(data)
+>>>>>>> 38514db75f612133358b63aa34f441baf9e1ba83
 
-def predict_health(data: dict):
-    try:
-        df = prepare_dataframe(data)
+    
+    probability = float(loaded_pipeline.predict_proba(df)[0][1])
 
+<<<<<<< HEAD
         prediction = loaded_pipeline.predict(df)[0]
         model_label = normalize_model_prediction(prediction)
         model_proba_yes = get_proba_yes(df)
@@ -186,7 +221,22 @@ def predict_health(data: dict):
                 "Low"
             ),
         }
+=======
+    
+    threshold = 0.60
+    prediction = "Yes" if probability >= threshold else "No"
 
-    except Exception as e:
-        print("Prediction error:", e)
-        raise e
+
+    if probability >= 0.38:
+        risk = "High"
+    elif probability >= 0.35:
+        risk = "Medium"
+    else:
+        risk = "Low"
+>>>>>>> 38514db75f612133358b63aa34f441baf9e1ba83
+
+    return {
+        "chronicDisease": prediction,
+        "probability": round(probability * 100, 2),
+        "riskLevel": risk
+    }
