@@ -34,7 +34,53 @@ interface FormData {
   sleepHours: number[]
   stressLevel: number[]
 }
-const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+interface RawPredictionResponse {
+  chronicDisease?: boolean | string | number
+  chronic_disease?: boolean | string | number
+  prediction?: boolean | string | number
+  confidence?: number | string
+  probability?: number | string
+  riskLevel?: string
+  risk_level?: string
+  risk?: string
+}
+
+const normalizeLabel = (value: unknown) => String(value ?? "").trim().toLowerCase()
+
+function toBooleanPrediction(value: unknown): boolean {
+  if (typeof value === "boolean") return value
+  if (typeof value === "number") return value === 1
+
+  const normalized = normalizeLabel(value)
+  if (["yes", "true", "1", "high", "at risk", "risk"].includes(normalized)) return true
+  if (["no", "false", "0", "low", "healthy", "not at risk"].includes(normalized)) return false
+  return Boolean(value)
+}
+
+function toRiskLevel(value: unknown): PredictionData["riskLevel"] {
+  const normalized = normalizeLabel(value)
+  if (normalized.startsWith("low")) return "Low"
+  if (normalized.startsWith("medium") || normalized.startsWith("moderate")) return "Medium"
+  return "High"
+}
+
+function toConfidence(value: unknown): number {
+  const numeric = typeof value === "number" ? value : Number(value)
+  if (!Number.isFinite(numeric)) return 0
+  return Number(Math.min(100, Math.max(0, numeric)).toFixed(2))
+}
+
+function normalizePredictionResponse(raw: RawPredictionResponse): PredictionData {
+  const chronicDiseaseRaw = raw.chronicDisease ?? raw.chronic_disease ?? raw.prediction ?? false
+  const riskLevelRaw = raw.riskLevel ?? raw.risk_level ?? raw.risk ?? (toBooleanPrediction(chronicDiseaseRaw) ? "High" : "Low")
+  const confidenceRaw = raw.confidence ?? raw.probability ?? 0
+
+  return {
+    chronicDisease: toBooleanPrediction(chronicDiseaseRaw),
+    riskLevel: toRiskLevel(riskLevelRaw),
+    confidence: toConfidence(confidenceRaw),
+  }
+}
 
 
 export function HealthInput() {
@@ -70,7 +116,7 @@ export function HealthInput() {
     setError(null)
 
     try {
-      const res = await fetch('https://health-prediction-1rcn.onrender.com/api/predict/', {
+      const res = await fetch("/api/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -88,9 +134,19 @@ export function HealthInput() {
         }),
       })
 
-      if (!res.ok) throw new Error(await res.text())
-      const data = await res.json()
-      setPrediction(data)
+      if (!res.ok) {
+        const raw = await res.text()
+        let message = raw || "Prediction failed"
+        try {
+          const parsed = JSON.parse(raw) as { error?: string; details?: { message?: string } }
+          message = parsed.error || parsed.details?.message || message
+        } catch {
+          // Keep raw response text if JSON parsing fails
+        }
+        throw new Error(message)
+      }
+      const data = (await res.json()) as RawPredictionResponse
+      setPrediction(normalizePredictionResponse(data))
     } catch (err: any) {
       setError(err.message || "Prediction failed")
     } finally {
