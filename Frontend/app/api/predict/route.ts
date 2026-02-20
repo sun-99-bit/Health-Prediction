@@ -12,7 +12,10 @@ export async function POST(request: Request) {
   try {
     const payload = await request.json()
     const configured = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL
-    const bases = [configured, defaultBackendUrl]
+    // If user configured an API URL, do not silently fall back to default.
+    // This avoids masking local/backend deployment issues with stale predictions.
+    const candidates = configured ? [configured] : [defaultBackendUrl]
+    const bases = candidates
       .filter((value): value is string => Boolean(value))
       .map((value) => cleanBase(normalizeBase(value)))
       .filter((value, index, arr) => arr.indexOf(value) === index)

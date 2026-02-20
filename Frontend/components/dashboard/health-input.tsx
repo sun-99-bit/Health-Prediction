@@ -1,12 +1,12 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useMemo, useState } from "react"
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Activity, Loader2, HeartPulse } from "lucide-react"
+import { Activity, HeartPulse, Loader2 } from "lucide-react"
 import { PredictionResult, type PredictionData } from "./prediction-result"
 
 interface FormData {
@@ -34,6 +34,7 @@ interface FormData {
   sleepHours: number[]
   stressLevel: number[]
 }
+
 interface RawPredictionResponse {
   chronicDisease?: boolean | string | number
   chronic_disease?: boolean | string | number
@@ -45,7 +46,30 @@ interface RawPredictionResponse {
   risk?: string
 }
 
+interface InputFieldProps {
+  label: string
+  value: string
+  onChange: (value: string) => void
+}
+
+interface SelectFieldProps {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: [string, string][]
+}
+
+interface SliderFieldProps {
+  label: string
+  value: number[]
+  min: number
+  max: number
+  step: number
+  onChange: (value: number[]) => void
+}
+
 const normalizeLabel = (value: unknown) => String(value ?? "").trim().toLowerCase()
+const BMI_PLACEHOLDER = "-"
 
 function toBooleanPrediction(value: unknown): boolean {
   if (typeof value === "boolean") return value
@@ -72,7 +96,8 @@ function toConfidence(value: unknown): number {
 
 function normalizePredictionResponse(raw: RawPredictionResponse): PredictionData {
   const chronicDiseaseRaw = raw.chronicDisease ?? raw.chronic_disease ?? raw.prediction ?? false
-  const riskLevelRaw = raw.riskLevel ?? raw.risk_level ?? raw.risk ?? (toBooleanPrediction(chronicDiseaseRaw) ? "High" : "Low")
+  const riskLevelRaw =
+    raw.riskLevel ?? raw.risk_level ?? raw.risk ?? (toBooleanPrediction(chronicDiseaseRaw) ? "High" : "Low")
   const confidenceRaw = raw.confidence ?? raw.probability ?? 0
 
   return {
@@ -81,7 +106,6 @@ function normalizePredictionResponse(raw: RawPredictionResponse): PredictionData
     confidence: toConfidence(confidenceRaw),
   }
 }
-
 
 export function HealthInput() {
   const [form, setForm] = useState<FormData>({
@@ -101,15 +125,13 @@ export function HealthInput() {
   const [prediction, setPrediction] = useState<PredictionData | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // ---------------- BMI ----------------
   const bmi = useMemo(() => {
     const h = parseFloat(form.height) / 100
     const w = parseFloat(form.weight)
     if (h > 0 && w > 0) return (w / (h * h)).toFixed(1)
-    return "—"
+    return BMI_PLACEHOLDER
   }, [form.height, form.weight])
 
-  // ---------------- Predict ----------------
   const handlePredict = async () => {
     setLoading(true)
     setPrediction(null)
@@ -124,7 +146,7 @@ export function HealthInput() {
           gender: form.gender,
           height: Number(form.height),
           weight: Number(form.weight),
-          bmi: bmi === "—" ? 0 : Number(bmi),
+          bmi: bmi === BMI_PLACEHOLDER ? 0 : Number(bmi),
           smoker: form.smoker,
           alcohol: form.alcohol,
           exercise: form.exercise,
@@ -141,10 +163,11 @@ export function HealthInput() {
           const parsed = JSON.parse(raw) as { error?: string; details?: { message?: string } }
           message = parsed.error || parsed.details?.message || message
         } catch {
-          // Keep raw response text if JSON parsing fails
+          // Keep raw response text if JSON parsing fails.
         }
         throw new Error(message)
       }
+
       const data = (await res.json()) as RawPredictionResponse
       setPrediction(normalizePredictionResponse(data))
     } catch (err: any) {
@@ -163,12 +186,8 @@ export function HealthInput() {
               <HeartPulse className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-2xl font-semibold">
-                Health Risk Assessment
-              </CardTitle>
-              <CardDescription>
-                Fill in your health details to predict chronic disease risk
-              </CardDescription>
+              <CardTitle className="text-2xl font-semibold">Health Risk Assessment</CardTitle>
+              <CardDescription>Fill in your health details to predict chronic disease risk</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -176,35 +195,48 @@ export function HealthInput() {
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             <InputField label="Age" value={form.age} onChange={(v) => setForm({ ...form, age: v })} />
-            <SelectField label="Gender" value={form.gender} onChange={(v) => setForm({ ...form, gender: v })}
-              options={[["male","Male"],["female","Female"],["other","Other"]]} />
+            <SelectField
+              label="Gender"
+              value={form.gender}
+              onChange={(v) => setForm({ ...form, gender: v })}
+              options={[["male", "Male"], ["female", "Female"], ["other", "Other"]]}
+            />
 
             <InputField label="Height (cm)" value={form.height} onChange={(v) => setForm({ ...form, height: v })} />
             <InputField label="Weight (kg)" value={form.weight} onChange={(v) => setForm({ ...form, weight: v })} />
 
             <div className="flex flex-col gap-2">
               <Label>BMI (Auto)</Label>
-              <Input
-                readOnly
-                value={bmi}
-                className="bg-muted font-mono text-center"
-              />
+              <Input readOnly value={bmi} className="bg-muted font-mono text-center" />
             </div>
 
-            <SelectField label="Smoking" value={form.smoker} onChange={(v) => setForm({ ...form, smoker: v })}
-              options={[["yes","Yes"],["no","No"]]} />
+            <SelectField
+              label="Smoking"
+              value={form.smoker}
+              onChange={(v) => setForm({ ...form, smoker: v })}
+              options={[["yes", "Yes"], ["no", "No"]]}
+            />
 
-            <SelectField label="Alcohol Consumption" value={form.alcohol}
+            <SelectField
+              label="Alcohol Consumption"
+              value={form.alcohol}
               onChange={(v) => setForm({ ...form, alcohol: v })}
-              options={[["none","None"],["low","Low"],["moderate","Moderate"],["high","High"]]} />
+              options={[["none", "None"], ["low", "Low"], ["moderate", "Moderate"], ["high", "High"]]}
+            />
 
-            <SelectField label="Exercise Frequency" value={form.exercise}
+            <SelectField
+              label="Exercise Frequency"
+              value={form.exercise}
               onChange={(v) => setForm({ ...form, exercise: v })}
-              options={[["none","None"],["1-2","1–2 / week"],["3-5","3–5 / week"],["daily","Daily"]]} />
+              options={[["none", "None"], ["1-2", "1-2 / week"], ["3-5", "3-5 / week"], ["daily", "Daily"]]}
+            />
 
-            <SelectField label="Diet Quality" value={form.diet}
+            <SelectField
+              label="Diet Quality"
+              value={form.diet}
               onChange={(v) => setForm({ ...form, diet: v })}
-              options={[["poor","Poor"],["good","Good"],["excellent","Excellent"]]} />
+              options={[["poor", "Poor"], ["good", "Good"], ["excellent", "Excellent"]]}
+            />
 
             <SliderField
               label={`Sleep Hours: ${form.sleepHours[0]} h`}
@@ -226,12 +258,7 @@ export function HealthInput() {
           </div>
 
           <div className="mt-8 flex justify-center">
-            <Button
-              size="lg"
-              onClick={handlePredict}
-              disabled={loading}
-              className="gap-2 px-8"
-            >
+            <Button size="lg" onClick={handlePredict} disabled={loading} className="gap-2 px-8">
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -246,11 +273,7 @@ export function HealthInput() {
             </Button>
           </div>
 
-          {error && (
-            <p className="mt-4 text-center text-sm text-red-600">
-              {error}
-            </p>
-          )}
+          {error && <p className="mt-4 text-center text-sm text-red-600">{error}</p>}
         </CardContent>
       </Card>
 
@@ -261,9 +284,7 @@ export function HealthInput() {
   )
 }
 
-/* ---------------- Reusable UI Components ---------------- */
-
-function InputField({ label, value, onChange }: any) {
+function InputField({ label, value, onChange }: InputFieldProps) {
   return (
     <div className="flex flex-col gap-2">
       <Label className="text-sm font-medium">{label}</Label>
@@ -272,7 +293,7 @@ function InputField({ label, value, onChange }: any) {
   )
 }
 
-function SelectField({ label, value, onChange, options }: any) {
+function SelectField({ label, value, onChange, options }: SelectFieldProps) {
   return (
     <div className="flex flex-col gap-2">
       <Label className="text-sm font-medium">{label}</Label>
@@ -281,8 +302,10 @@ function SelectField({ label, value, onChange, options }: any) {
           <SelectValue placeholder={`Select ${label}`} />
         </SelectTrigger>
         <SelectContent>
-          {options.map(([v, l]: any) => (
-            <SelectItem key={v} value={v}>{l}</SelectItem>
+          {options.map(([v, l]) => (
+            <SelectItem key={v} value={v}>
+              {l}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -290,17 +313,11 @@ function SelectField({ label, value, onChange, options }: any) {
   )
 }
 
-function SliderField({ label, value, min, max, step, onChange }: any) {
+function SliderField({ label, value, min, max, step, onChange }: SliderFieldProps) {
   return (
     <div className="flex flex-col gap-3">
       <Label className="text-sm font-medium">{label}</Label>
-      <Slider
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onValueChange={onChange}
-      />
+      <Slider min={min} max={max} step={step} value={value} onValueChange={onChange} />
     </div>
   )
 }
